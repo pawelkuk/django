@@ -217,7 +217,11 @@ class Statement(Reference):
                 part.rename_column_references(table, old_column, new_column)
 
     def __str__(self):
-        return self.template % self.parts
+        try:
+            return self.template % self.parts
+        except KeyError:
+            # import bpdb; bpdb.set_trace()
+            print("X?X?")
 
 
 class Expressions(TableColumns):

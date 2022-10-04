@@ -10,32 +10,32 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
     sql_create_sequence = "CREATE SEQUENCE %(sequence)s"
     sql_delete_sequence = "DROP SEQUENCE IF EXISTS %(sequence)s CASCADE"
     sql_set_sequence_max = (
-        "SELECT setval('%(sequence)s', MAX(%(column)s)) FROM %(table)s"
+        "SELECT setval('%(sequence)s', MAX(%(column)s)) FROM %(schema)s.%(table)s"
     )
-    sql_set_sequence_owner = "ALTER SEQUENCE %(sequence)s OWNED BY %(table)s.%(column)s"
+    sql_set_sequence_owner = "ALTER SEQUENCE %(schema)s.%(sequence)s OWNED BY %(schema)s.%(table)s.%(column)s"
 
     sql_create_index = (
-        "CREATE INDEX %(name)s ON %(table)s%(using)s "
+        "CREATE INDEX %(name)s ON %(schema)s.%(table)s%(using)s "
         "(%(columns)s)%(include)s%(extra)s%(condition)s"
     )
     sql_create_index_concurrently = (
-        "CREATE INDEX CONCURRENTLY %(name)s ON %(table)s%(using)s "
+        "CREATE INDEX CONCURRENTLY %(name)s ON %(schema)s.%(table)s%(using)s "
         "(%(columns)s)%(include)s%(extra)s%(condition)s"
     )
-    sql_delete_index = "DROP INDEX IF EXISTS %(name)s"
-    sql_delete_index_concurrently = "DROP INDEX CONCURRENTLY IF EXISTS %(name)s"
+    sql_delete_index = "DROP INDEX IF EXISTS %(schema)s.%(name)s"
+    sql_delete_index_concurrently = "DROP INDEX CONCURRENTLY IF EXISTS %(schema)s.%(name)s"
 
     # Setting the constraint to IMMEDIATE to allow changing data in the same
     # transaction.
     sql_create_column_inline_fk = (
-        "CONSTRAINT %(name)s REFERENCES %(to_table)s(%(to_column)s)%(deferrable)s"
-        "; SET CONSTRAINTS %(namespace)s%(name)s IMMEDIATE"
+        "CONSTRAINT %(name)s REFERENCES %(schema)s.%(to_table)s(%(to_column)s)%(deferrable)s"
+        "; SET CONSTRAINTS %(schema)s.%(namespace)s%(name)s IMMEDIATE"
     )
     # Setting the constraint to IMMEDIATE runs any deferred checks to allow
     # dropping it in the same transaction.
     sql_delete_fk = (
-        "SET CONSTRAINTS %(name)s IMMEDIATE; "
-        "ALTER TABLE %(table)s DROP CONSTRAINT %(name)s"
+        "SET CONSTRAINTS %(schema)s.%(name)s IMMEDIATE; "
+        "ALTER TABLE %(schema)s.%(table)s DROP CONSTRAINT %(name)s"
     )
     sql_delete_procedure = "DROP FUNCTION %(procedure)s(%(param_types)s)"
 
@@ -154,6 +154,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                         self.sql_alter_column
                         % {
                             "table": self.quote_name(table),
+                            "schema": self.quote_name(self.connection.schema_name),
                             "changes": self.sql_alter_column_default
                             % {
                                 "column": self.quote_name(column),
@@ -169,6 +170,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                             "table": self.quote_name(table),
                             "column": self.quote_name(column),
                             "sequence": self.quote_name(sequence_name),
+                            "schema": self.quote_name(self.connection.schema_name),
                         },
                         [],
                     ),
@@ -178,6 +180,7 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
                             "table": self.quote_name(table),
                             "column": self.quote_name(column),
                             "sequence": self.quote_name(sequence_name),
+                            "schema": self.quote_name(self.connection.schema_name),
                         },
                         [],
                     ),

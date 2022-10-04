@@ -3,7 +3,7 @@ Useful auxiliary data structures for query construction. Not useful outside
 the SQL domain.
 """
 from django.db.models.sql.constants import INNER, LOUTER
-
+from django_tenants.database import db_connection
 
 class MultiJoin(Exception):
     """
@@ -66,7 +66,6 @@ class Join:
         # Is this join nullabled?
         self.nullable = nullable
         self.filtered_relation = filtered_relation
-
     def as_sql(self, compiler, connection):
         """
         Generate the full
@@ -80,6 +79,7 @@ class Join:
 
         # Add a join condition for each pair of joining columns.
         for lhs_col, rhs_col in self.join_cols:
+            # X?X?
             join_conditions.append(
                 "%s.%s = %s.%s"
                 % (
@@ -115,8 +115,9 @@ class Join:
         alias_str = (
             "" if self.table_alias == self.table_name else (" %s" % self.table_alias)
         )
-        sql = "%s %s%s ON (%s)" % (
+        sql = "%s %s.%s%s ON (%s)" % (
             self.join_type,
+            qn(connection.schema_name),
             qn(self.table_name),
             alias_str,
             on_clause_sql,
@@ -189,6 +190,7 @@ class BaseTable:
     filtered_relation = None
 
     def __init__(self, table_name, alias):
+        print(80*"@", table_name, alias)
         self.table_name = table_name
         self.table_alias = alias
 
@@ -197,7 +199,7 @@ class BaseTable:
             "" if self.table_alias == self.table_name else (" %s" % self.table_alias)
         )
         base_sql = compiler.quote_name_unless_alias(self.table_name)
-        return base_sql + alias_str, []
+        return f'"{connection.schema_name}".' + base_sql + alias_str, []
 
     def relabeled_clone(self, change_map):
         return self.__class__(
