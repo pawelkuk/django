@@ -3,7 +3,6 @@ import json
 import re
 from functools import partial
 from itertools import chain
-from myscripts.debug import debug
 from django.core.exceptions import EmptyResultSet, FieldError
 from django.db import DatabaseError, NotSupportedError
 from django.db.models.constants import LOOKUP_SEP
@@ -916,7 +915,6 @@ class SQLCompiler:
         )
         alias = joins[-1]
         return field, targets, alias, joins, path, opts, transform_function
-    # @debug
     def get_from_clause(self):
         """
         Return a list of strings that are joined together to go after the

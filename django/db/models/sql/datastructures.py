@@ -4,7 +4,6 @@ the SQL domain.
 """
 from django.db.models.sql.constants import INNER, LOUTER
 from django_tenants.database import db_connection
-from myscripts.debug import debug
 
 class MultiJoin(Exception):
     """
@@ -67,7 +66,6 @@ class Join:
         # Is this join nullabled?
         self.nullable = nullable
         self.filtered_relation = filtered_relation
-    @debug
     def as_sql(self, compiler, connection):
         """
         Generate the full
