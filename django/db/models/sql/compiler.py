@@ -3,7 +3,7 @@ import json
 import re
 from functools import partial
 from itertools import chain
-
+from myscripts.debug import debug
 from django.core.exceptions import EmptyResultSet, FieldError
 from django.db import DatabaseError, NotSupportedError
 from django.db.models.constants import LOOKUP_SEP
@@ -916,7 +916,7 @@ class SQLCompiler:
         )
         alias = joins[-1]
         return field, targets, alias, joins, path, opts, transform_function
-
+    # @debug
     def get_from_clause(self):
         """
         Return a list of strings that are joined together to go after the
@@ -930,7 +930,7 @@ class SQLCompiler:
         """
         result = []
         params = []
-        for alias in tuple(self.query.alias_map):
+        for idx, alias in enumerate(tuple(self.query.alias_map)):
             if not self.query.alias_refcount[alias]:
                 continue
             try:
@@ -940,6 +940,7 @@ class SQLCompiler:
                 # alias_map if they aren't in a join. That's OK. We skip them.
                 continue
             clause_sql, clause_params = self.compile(from_clause)
+            # X?X?
             result.append(clause_sql)
             params.extend(clause_params)
         for t in self.query.extra_tables:
@@ -1539,7 +1540,7 @@ class SQLInsertCompiler(SQLCompiler):
         insert_statement = self.connection.ops.insert_statement(
             ignore_conflicts=self.query.ignore_conflicts
         )
-        result = ["%s %s" % (insert_statement, qn(opts.db_table))]
+        result = ["%s %s.%s" % (insert_statement, qn(self.connection.schema_name), qn(opts.db_table))]
         fields = self.query.fields or [opts.pk]
         result.append("(%s)" % ", ".join(qn(f.column) for f in fields))
 
@@ -1679,7 +1680,7 @@ class SQLDeleteCompiler(SQLCompiler):
         )
 
     def _as_sql(self, query):
-        result = ["DELETE FROM %s" % self.quote_name_unless_alias(query.base_table)]
+        result = ["DELETE FROM %s.%s" % (self.quote_name_unless_alias(self.connection.schema_name), self.quote_name_unless_alias(query.base_table))]
         where, params = self.compile(query.where)
         if where:
             result.append("WHERE %s" % where)
@@ -1765,7 +1766,7 @@ class SQLUpdateCompiler(SQLCompiler):
                 values.append("%s = NULL" % qn(name))
         table = self.query.base_table
         result = [
-            "UPDATE %s SET" % qn(table),
+            "UPDATE %s.%s SET" % (qn(self.connection.schema_name), qn(table)),
             ", ".join(values),
         ]
         where, params = self.compile(self.query.where)

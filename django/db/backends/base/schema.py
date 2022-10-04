@@ -74,13 +74,14 @@ class BaseDatabaseSchemaEditor:
     """
 
     # Overrideable SQL templates
-    sql_create_table = "CREATE TABLE %(table)s (%(definition)s)"
-    sql_rename_table = "ALTER TABLE %(old_table)s RENAME TO %(new_table)s"
-    sql_retablespace_table = "ALTER TABLE %(table)s SET TABLESPACE %(new_tablespace)s"
-    sql_delete_table = "DROP TABLE %(table)s CASCADE"
+    # X?X?
+    sql_create_table = "CREATE TABLE %(schema)s.%(table)s (%(definition)s)"
+    sql_rename_table = "ALTER TABLE %(schema)s.%(old_table)s RENAME TO %(new_table)s"
+    sql_retablespace_table = "ALTER TABLE %(schema)s.%(table)s SET TABLESPACE %(new_tablespace)s"
+    sql_delete_table = "DROP TABLE %(schema)s.%(table)s CASCADE"
 
-    sql_create_column = "ALTER TABLE %(table)s ADD COLUMN %(column)s %(definition)s"
-    sql_alter_column = "ALTER TABLE %(table)s %(changes)s"
+    sql_create_column = "ALTER TABLE %(schema)s.%(table)s ADD COLUMN %(column)s %(definition)s"
+    sql_alter_column = "ALTER TABLE %(schema)s.%(table)s %(changes)s"
     sql_alter_column_type = "ALTER COLUMN %(column)s TYPE %(type)s"
     sql_alter_column_null = "ALTER COLUMN %(column)s DROP NOT NULL"
     sql_alter_column_not_null = "ALTER COLUMN %(column)s SET NOT NULL"
@@ -88,48 +89,48 @@ class BaseDatabaseSchemaEditor:
     sql_alter_column_no_default = "ALTER COLUMN %(column)s DROP DEFAULT"
     sql_alter_column_no_default_null = sql_alter_column_no_default
     sql_alter_column_collate = "ALTER COLUMN %(column)s TYPE %(type)s%(collation)s"
-    sql_delete_column = "ALTER TABLE %(table)s DROP COLUMN %(column)s CASCADE"
+    sql_delete_column = "ALTER TABLE %(schema)s.%(table)s DROP COLUMN %(column)s CASCADE"
     sql_rename_column = (
-        "ALTER TABLE %(table)s RENAME COLUMN %(old_column)s TO %(new_column)s"
+        "ALTER TABLE %(schema)s.%(table)s RENAME COLUMN %(old_column)s TO %(new_column)s"
     )
     sql_update_with_default = (
-        "UPDATE %(table)s SET %(column)s = %(default)s WHERE %(column)s IS NULL"
+        "UPDATE %(schema)s.%(table)s SET %(column)s = %(default)s WHERE %(column)s IS NULL"
     )
 
     sql_unique_constraint = "UNIQUE (%(columns)s)%(deferrable)s"
     sql_check_constraint = "CHECK (%(check)s)"
-    sql_delete_constraint = "ALTER TABLE %(table)s DROP CONSTRAINT %(name)s"
+    sql_delete_constraint = "ALTER TABLE %(schema)s.%(table)s DROP CONSTRAINT %(name)s"
     sql_constraint = "CONSTRAINT %(name)s %(constraint)s"
 
-    sql_create_check = "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s CHECK (%(check)s)"
+    sql_create_check = "ALTER TABLE %(schema)s.%(table)s ADD CONSTRAINT %(name)s CHECK (%(check)s)"
     sql_delete_check = sql_delete_constraint
 
     sql_create_unique = (
-        "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s "
+        "ALTER TABLE %(schema)s.%(table)s ADD CONSTRAINT %(name)s "
         "UNIQUE (%(columns)s)%(deferrable)s"
     )
     sql_delete_unique = sql_delete_constraint
 
     sql_create_fk = (
-        "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s FOREIGN KEY (%(column)s) "
-        "REFERENCES %(to_table)s (%(to_column)s)%(deferrable)s"
+        "ALTER TABLE %(schema)s.%(table)s ADD CONSTRAINT %(name)s FOREIGN KEY (%(column)s) "
+        "REFERENCES %(schema)s.%(to_table)s (%(to_column)s)%(deferrable)s"
     )
     sql_create_inline_fk = None
     sql_create_column_inline_fk = None
     sql_delete_fk = sql_delete_constraint
 
     sql_create_index = (
-        "CREATE INDEX %(name)s ON %(table)s "
+        "CREATE INDEX %(name)s ON %(schema)s.%(table)s "
         "(%(columns)s)%(include)s%(extra)s%(condition)s"
     )
     sql_create_unique_index = (
-        "CREATE UNIQUE INDEX %(name)s ON %(table)s "
+        "CREATE UNIQUE INDEX %(name)s ON %(schema)s.%(table)s "
         "(%(columns)s)%(include)s%(condition)s"
     )
     sql_delete_index = "DROP INDEX %(name)s"
 
     sql_create_pk = (
-        "ALTER TABLE %(table)s ADD CONSTRAINT %(name)s PRIMARY KEY (%(columns)s)"
+        "ALTER TABLE %(schema)s.%(table)s ADD CONSTRAINT %(name)s PRIMARY KEY (%(columns)s)"
     )
     sql_delete_pk = sql_delete_constraint
 
@@ -260,6 +261,7 @@ class BaseDatabaseSchemaEditor:
             for constraint in model._meta.constraints
         ]
         sql = self.sql_create_table % {
+            "schema": self.quote_name(self.connection.schema_name),
             "table": self.quote_name(model._meta.db_table),
             "definition": ", ".join(
                 constraint for constraint in (*column_sqls, *constraints) if constraint
@@ -451,6 +453,7 @@ class BaseDatabaseSchemaEditor:
         self.execute(
             self.sql_delete_table
             % {
+                "schema": self.quote_name(self.connection.schema_name),
                 "table": self.quote_name(model._meta.db_table),
             }
         )
@@ -569,6 +572,7 @@ class BaseDatabaseSchemaEditor:
             % {
                 "old_table": self.quote_name(old_db_table),
                 "new_table": self.quote_name(new_db_table),
+                "schema": self.quote_name(self.connection.schema_name),
             }
         )
         # Rename all references to the old table name.
@@ -584,6 +588,7 @@ class BaseDatabaseSchemaEditor:
                 "table": self.quote_name(model._meta.db_table),
                 "old_tablespace": self.quote_name(old_db_tablespace),
                 "new_tablespace": self.quote_name(new_db_tablespace),
+                "schema": self.quote_name(self.connection.schema_name),
             }
         )
 
@@ -624,6 +629,7 @@ class BaseDatabaseSchemaEditor:
                     else "",
                     "column": self.quote_name(field.column),
                     "to_table": self.quote_name(to_table),
+                    "schema": self.quote_name(self.connection.schema_name),
                     "to_column": self.quote_name(to_column),
                     "deferrable": self.connection.ops.deferrable_sql(),
                 }
@@ -637,6 +643,7 @@ class BaseDatabaseSchemaEditor:
             "table": self.quote_name(model._meta.db_table),
             "column": self.quote_name(field.column),
             "definition": definition,
+            "schema": self.quote_name(self.connection.schema_name),
         }
         self.execute(sql, params)
         # Drop the default if we need to
@@ -651,6 +658,7 @@ class BaseDatabaseSchemaEditor:
             sql = self.sql_alter_column % {
                 "table": self.quote_name(model._meta.db_table),
                 "changes": changes_sql,
+                "schema": self.quote_name(self.connection.schema_name),
             }
             self.execute(sql, params)
         # Add an index, if required
@@ -678,6 +686,7 @@ class BaseDatabaseSchemaEditor:
         # Delete the column
         sql = self.sql_delete_column % {
             "table": self.quote_name(model._meta.db_table),
+            "schema": self.quote_name(self.connection.schema_name),
             "column": self.quote_name(field.column),
         }
         self.execute(sql)
@@ -963,6 +972,7 @@ class BaseDatabaseSchemaEditor:
                 self.execute(
                     self.sql_alter_column
                     % {
+                        "schema": self.quote_name(self.connection.schema_name),
                         "table": self.quote_name(model._meta.db_table),
                         "changes": sql,
                     },
@@ -976,6 +986,7 @@ class BaseDatabaseSchemaEditor:
                         "table": self.quote_name(model._meta.db_table),
                         "column": self.quote_name(new_field.column),
                         "default": "%s",
+                        "schema": self.quote_name(self.connection.schema_name),
                     },
                     [new_default],
                 )
@@ -987,6 +998,8 @@ class BaseDatabaseSchemaEditor:
                         % {
                             "table": self.quote_name(model._meta.db_table),
                             "changes": sql,
+                            "schema": self.quote_name(self.connection.schema_name),
+
                         },
                         params,
                     )
@@ -1036,6 +1049,7 @@ class BaseDatabaseSchemaEditor:
                 self.sql_alter_column
                 % {
                     "table": self.quote_name(new_rel.related_model._meta.db_table),
+                    "schema": self.quote_name(self.connection.schema_name),
                     "changes": fragment[0],
                 },
                 fragment[1],
@@ -1076,6 +1090,7 @@ class BaseDatabaseSchemaEditor:
                 model, old_field, new_field, drop=True
             )
             sql = self.sql_alter_column % {
+                "schema": self.quote_name(self.connection.schema_name),
                 "table": self.quote_name(model._meta.db_table),
                 "changes": changes_sql,
             }
@@ -1166,6 +1181,7 @@ class BaseDatabaseSchemaEditor:
                 self.sql_alter_column_type
                 % {
                     "column": self.quote_name(new_field.column),
+                    "schema": self.quote_name(self.connection.schema_name),
                     "type": new_type,
                 },
                 [],
@@ -1325,6 +1341,7 @@ class BaseDatabaseSchemaEditor:
             extra=tablespace_sql,
             condition=self._index_condition_sql(condition),
             include=self._index_include_sql(model, include),
+            schema=self.quote_name(self.connection.schema_name),
         )
 
     def _delete_index_sql(self, model, name, sql=None):
@@ -1332,6 +1349,7 @@ class BaseDatabaseSchemaEditor:
             sql or self.sql_delete_index,
             table=Table(model._meta.db_table, self.quote_name),
             name=self.quote_name(name),
+            schema=self.quote_name(self.connection.schema_name),
         )
 
     def _index_columns(self, table, columns, col_suffixes, opclasses):
@@ -1410,6 +1428,7 @@ class BaseDatabaseSchemaEditor:
 
     def _rename_field_sql(self, table, old_field, new_field, new_type):
         return self.sql_rename_column % {
+            "schema": self.quote_name(self.connection.schema_name),
             "table": self.quote_name(table),
             "old_column": self.quote_name(old_field.column),
             "new_column": self.quote_name(new_field.column),
@@ -1435,6 +1454,7 @@ class BaseDatabaseSchemaEditor:
             to_table=to_table,
             to_column=to_column,
             deferrable=deferrable,
+            schema=self.quote_name(self.connection.schema_name)
         )
 
     def _fk_constraint_name(self, model, field, suffix):
@@ -1555,6 +1575,7 @@ class BaseDatabaseSchemaEditor:
             condition=self._index_condition_sql(condition),
             deferrable=self._deferrable_constraint_sql(deferrable),
             include=self._index_include_sql(model, include),
+            schema=self.quote_name(self.connection.schema_name)
         )
 
     def _delete_unique_sql(
@@ -1597,6 +1618,7 @@ class BaseDatabaseSchemaEditor:
             table=Table(model._meta.db_table, self.quote_name),
             name=self.quote_name(name),
             check=check,
+            schema=self.quote_name(self.connection.schema_name)
         )
 
     def _delete_check_sql(self, model, name):
@@ -1607,6 +1629,7 @@ class BaseDatabaseSchemaEditor:
             template,
             table=Table(model._meta.db_table, self.quote_name),
             name=self.quote_name(name),
+            schema=self.quote_name(self.connection.schema_name),
         )
 
     def _constraint_names(
@@ -1673,6 +1696,7 @@ class BaseDatabaseSchemaEditor:
                 )
             ),
             columns=Columns(model._meta.db_table, [field.column], self.quote_name),
+            schema=self.quote_name(self.connection.schema_name)
         )
 
     def _delete_primary_key_sql(self, model, name):

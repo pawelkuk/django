@@ -67,11 +67,12 @@ class DatabaseCache(BaseDatabaseCache):
 
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT %s, %s, %s FROM %s WHERE %s IN (%s)"
+                "SELECT %s, %s, %s FROM %s.%s WHERE %s IN (%s)"
                 % (
                     quote_name("cache_key"),
                     quote_name("value"),
                     quote_name("expires"),
+                    quote_name(connection.schema_name),
                     table,
                     quote_name("cache_key"),
                     ", ".join(["%s"] * len(key_map)),
@@ -118,7 +119,7 @@ class DatabaseCache(BaseDatabaseCache):
         table = quote_name(self._table)
 
         with connection.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) FROM %s" % table)
+            cursor.execute("SELECT COUNT(*) FROM %s.%s" % (quote_name(connection.schema_name),table))
             num = cursor.fetchone()[0]
             now = timezone.now()
             now = now.replace(microsecond=0)
@@ -141,10 +142,11 @@ class DatabaseCache(BaseDatabaseCache):
                 # regressions.
                 with transaction.atomic(using=db):
                     cursor.execute(
-                        "SELECT %s, %s FROM %s WHERE %s = %%s"
+                        "SELECT %s, %s FROM %s.%s WHERE %s = %%s"
                         % (
                             quote_name("cache_key"),
                             quote_name("expires"),
+                            quote_name(connection.schema_name),
                             table,
                             quote_name("cache_key"),
                         ),
@@ -167,16 +169,17 @@ class DatabaseCache(BaseDatabaseCache):
                     exp = connection.ops.adapt_datetimefield_value(exp)
                     if result and mode == "touch":
                         cursor.execute(
-                            "UPDATE %s SET %s = %%s WHERE %s = %%s"
-                            % (table, quote_name("expires"), quote_name("cache_key")),
+                            "UPDATE %s.%s SET %s = %%s WHERE %s = %%s"
+                            % (quote_name(connection.schema_name), table, quote_name("expires"), quote_name("cache_key")),
                             [exp, key],
                         )
                     elif result and (
                         mode == "set" or (mode == "add" and current_expires < now)
                     ):
                         cursor.execute(
-                            "UPDATE %s SET %s = %%s, %s = %%s WHERE %s = %%s"
+                            "UPDATE %s.%s SET %s = %%s, %s = %%s WHERE %s = %%s"
                             % (
+                                quote_name(connection.schema_name),
                                 table,
                                 quote_name("value"),
                                 quote_name("expires"),
@@ -186,8 +189,9 @@ class DatabaseCache(BaseDatabaseCache):
                         )
                     elif mode != "touch":
                         cursor.execute(
-                            "INSERT INTO %s (%s, %s, %s) VALUES (%%s, %%s, %%s)"
+                            "INSERT INTO %s.%s (%s, %s, %s) VALUES (%%s, %%s, %%s)"
                             % (
+                                quote_name(connection.schema_name),
                                 table,
                                 quote_name("cache_key"),
                                 quote_name("value"),
@@ -222,8 +226,9 @@ class DatabaseCache(BaseDatabaseCache):
 
         with connection.cursor() as cursor:
             cursor.execute(
-                "DELETE FROM %s WHERE %s IN (%s)"
+                "DELETE FROM %s.%s WHERE %s IN (%s)"
                 % (
+                    quote_name(connection.schema_name),
                     table,
                     quote_name("cache_key"),
                     ", ".join(["%s"] * len(keys)),
@@ -243,9 +248,10 @@ class DatabaseCache(BaseDatabaseCache):
 
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT %s FROM %s WHERE %s = %%s and expires > %%s"
+                "SELECT %s FROM %s.%s WHERE %s = %%s and expires > %%s"
                 % (
                     quote_name("cache_key"),
+                    quote_name(connection.schema_name),
                     quote_name(self._table),
                     quote_name("cache_key"),
                 ),
@@ -258,9 +264,10 @@ class DatabaseCache(BaseDatabaseCache):
             self.clear()
         else:
             connection = connections[db]
+            quote_name = connection.ops.quote_name
             table = connection.ops.quote_name(self._table)
             cursor.execute(
-                "DELETE FROM %s WHERE expires < %%s" % table,
+                "DELETE FROM %s.%s WHERE expires < %%s" % (quote_name(connection.schema_name),table),
                 [connection.ops.adapt_datetimefield_value(now)],
             )
             deleted_count = cursor.rowcount
@@ -273,7 +280,7 @@ class DatabaseCache(BaseDatabaseCache):
                 last_cache_key = cursor.fetchone()
                 if last_cache_key:
                     cursor.execute(
-                        "DELETE FROM %s WHERE cache_key < %%s" % table,
+                        "DELETE FROM %s.%s WHERE cache_key < %%s" % (quote_name(connection.schema_name), table),
                         [last_cache_key[0]],
                     )
 
@@ -281,5 +288,7 @@ class DatabaseCache(BaseDatabaseCache):
         db = router.db_for_write(self.cache_model_class)
         connection = connections[db]
         table = connection.ops.quote_name(self._table)
+        quote_name = connection.ops.quote_name
+
         with connection.cursor() as cursor:
-            cursor.execute("DELETE FROM %s" % table)
+            cursor.execute("DELETE FROM %s.%s" % (quote_name(connection.schema_name),table))

@@ -3,11 +3,14 @@ import decimal
 import functools
 import hashlib
 import logging
+from psycopg2.errors import UndefinedObject
 import time
 from contextlib import contextmanager
+from django.db.utils import ProgrammingError
 
 from django.db import NotSupportedError
 from django.utils.dateparse import parse_time
+from psycopg2.errors import InvalidSchemaName
 
 logger = logging.getLogger("django.db.backends")
 
@@ -86,7 +89,12 @@ class CursorWrapper:
                 # params default might be backend specific.
                 return self.cursor.execute(sql)
             else:
-                return self.cursor.execute(sql, params)
+                try:
+                    return self.cursor.execute(sql, params)
+                except (UndefinedObject, InvalidSchemaName, TypeError, ProgrammingError) as e:
+                    # import bpdb; bpdb.set_trace()
+                    print("X?X?")
+                    raise
 
     def _executemany(self, sql, param_list, *ignored_wrapper_args):
         self.db.validate_no_broken_transaction()
